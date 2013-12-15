@@ -223,8 +223,8 @@ if (__name__ == '__main__'):
 			propfile.data.itemSets = itemSets.string
 			propfile.write()
 		else:
-			if args.itemset:
-				itemset = itemSets.itemSets[args.itemset]
+			if args.itemset <> None:
+				itemset.string = itemSets.itemSets[args.itemset].string
 			else:
 				print itemSets
 	
