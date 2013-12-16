@@ -4,9 +4,9 @@ import zlib
 import base64
 import argparse
 import shutil
-import StringIO
+import os
 
-#FIXME: Need custom pyamf... Normal one doesn't support Dictionary (0x11)
+#NOTE: pyamf from http://github.com/JohnPeel/pyamf !!!
 import pyamf, pyamf.amf3
 
 class Item(object):
@@ -192,45 +192,87 @@ class PropertiesFile(object):
 			f.write(self.encoder.stream.getvalue())
 		self.encoder.stream.truncate()
 
+def getSummoner(summoner, lol):
+    if (lol == None):
+	if (os.name == 'posix'): #Linux and Mac
+	    lol = os.path.join(os.environ.get('WINEPREFIX', os.path.expanduser('~/.wine')), 'drive_c', 'Riot Games', 'League of Legends')
+	    if not (os.path.exists(lol)):
+	      raise IOError('Cannot find LoL installation!')
+	    
+	elif (os.name == 'nt'): #Windows
+	    lol = os.path.join('C:', 'Riot Games', 'League of Legends')
+	    if not (os.path.exists(lol)):
+		raise IOError('Cannot find LoL installation!')
+	else:
+	    raise NotImplementedError() #ummm? Android? idk...
+    
+    lol = os.path.join(lol, 'RADS', 'projects', 'lol_air_client', 'releases')
+    if not (os.path.exists(lol)):
+	raise IOError('Cannot find complete LoL installation!')
+    
+    version = os.listdir(lol)[-1] #Latest version, hopefully...
+    
+    lol = os.path.join(lol, version, 'deploy', 'preferences')
+    
+    if (summoner is None):
+        summoners = filter(lambda x: (x[:7] <> 'shared_') and (x <> 'global'), os.listdir(lol)) #List summoners
+	if (len(summoners) == 0):
+	    raise IOError('You have no summoners!')
+	if (len(summoners) > 1):
+	    raise Exception('I have more than 1 summoner!')
+	summoner = summoners[0][:-11]
+    
+    lol = os.path.join(lol, summoner + '.properties')
+    
+    if not (os.path.exists(lol)):
+	raise IOError('Cannot find summoner! (' + lol + ')')
+    
+    return lol
+    
+
 if (__name__ == '__main__'):
-	parser = argparse.ArgumentParser(description='Installs a itemset into LoL.', prog='LoLISM')
+	parser = argparse.ArgumentParser(description='League of Legends - Item Set Manager', prog='LoLISM')
 	
-	parser.add_argument('-i', '--inject', help='Inject ITEMSET into SUMMONER.', action='store_true')
-
-	print_group = parser.add_mutually_exclusive_group()
-	print_group.add_argument('-p', '--print_link', help='Print link of ITEMSET.', action='store_true')
-	print_group.add_argument('-j', '--print_json', help='Print json of ITEMSET.', action='store_true')
-
-	parser.add_argument('-s', '--summoner', help='Summoner Properties File')
-	parser.add_argument('-m', '--itemset', help='ItemSet in Properties file', type=int)
+	parser.add_argument('-F', '--format', help='Select json, link, json-oneline.', choices=['json', 'link', 'json-oneline'], default='json')
+	parser.add_argument('-L', '--lol_location', help='Location of your LoL installation. (Example: "C:/Riot Games/League of Legens")', metavar='LOL', dest='lol')
 	
-	itemset_group = parser.add_mutually_exclusive_group()
+	summoner_group = parser.add_mutually_exclusive_group()
+	summoner_group.add_argument('-s', '--summoner', help='Summoner Name')
+	summoner_group.add_argument('-P', '--prop_file', help='Summoner Properties File', metavar='FILE')
+	
+	itemset_group = parser.add_mutually_exclusive_group(required=True)
+	itemset_group.add_argument('-m', '--itemset', help='ItemSet on selected Summoner', type=int)
 	itemset_group.add_argument('-l', '--link', help='ItemSet link')
-	itemset_group.add_argument('-f', '--file', help='ItemSet JSON file')
+	itemset_group.add_argument('-f', '--file', help='ItemSet JSON file (- is stdin)')
+	
+	action_group = parser.add_mutually_exclusive_group(required=True)
+	action_group.add_argument('-i', '--inject', help='Inject ITEMSET into SUMMONER.', action='store_const', const='inject', dest='action')
+	action_group.add_argument('-p', '--print', help='Print ITEMSET to stdout. [DEFAULT]', action='store_const', const='print', dest='action')
+	parser.set_defaults(action='print')
 	
 	args = parser.parse_args()
+	
 	itemset = ItemSet(args.file)
-
 	if args.link:
 		itemset.link = args.link
 	
-	if args.inject or args.summoner:
-		propfile = PropertiesFile(args.summoner or 'Dgby714.properties')
-		propfile.read()
-		itemSets = ItemSetDecoder().decode(propfile.data.itemSets)
-		if args.inject:
-			itemSets.itemSets.append(itemset)
-			propfile.data.itemSets = itemSets.string
-			propfile.write()
-		else:
-			if args.itemset <> None:
-				itemset.string = itemSets.itemSets[args.itemset].string
-			else:
-				print itemSets
+	if (args.summoner <> None) or (args.prop_file <> None) or (args.itemset <> None):
+	    if (args.prop_file == None):
+		args.prop_file = getSummoner(args.summoner, args.lol)
+	    propfile = PropertiesFile(args.prop_file)
+	    propfile.read()
+	    itemSets = ItemSetDecoder().decode(propfile.data.itemSets)
+	    if (args.itemset <> None):
+		itemset = itemSets.itemSets[args.itemset]
 	
-	if args.print_link:
-		print 'lolism://' + itemset.link
-
-	if args.print_json:
+	if (args.action == 'print'):
+	    if (args.format == 'json'):
 		print itemset
-	
+	    elif (args.format == 'link'):
+		print itemset.link
+	    else:
+		print itemset.string
+	else:
+	    itemSets.itemSets.append(itemset)
+	    propfile.data.itemSets = itemSets.string
+	    propfile.write()
