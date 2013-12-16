@@ -1,6 +1,7 @@
 League of Legends - Item Set Manager
 ====================================
 
+```
 usage: LoLISM [-h] [-F {json,link,json-oneline}] [-L LOL]
               [-s SUMMONER | -P FILE] (-m ITEMSET | -l LINK | -f FILE)
               (-i | -p)
@@ -22,3 +23,4 @@ optional arguments:
   -f FILE, --file FILE  ItemSet JSON file (- is stdin)
   -i, --inject          Inject ITEMSET into SUMMONER.
   -p, --print           Print ITEMSET to stdout. [DEFAULT]
+```
