@@ -89,12 +89,12 @@ class ItemSetDecoder(json.JSONDecoder):
 			raise Exception('Unknown JSON Object...')
 
 class RemoteClass(object):
-    def __init__(self, alias):
-        self.alias = alias
+	def __init__(self, alias):
+		self.alias = alias
 
-    def __call__(self, klass):
-        pyamf.register_class(klass, self.alias)
-        return klass
+	def __call__(self, klass):
+		pyamf.register_class(klass, self.alias)
+		return klass
 
 #FIXME: Why does it have a >???
 @RemoteClass(alias='>com.riotgames.platform.gameclient.domain.UserPrefs')
@@ -192,43 +192,55 @@ class PropertiesFile(object):
 			f.write(self.encoder.stream.getvalue())
 		self.encoder.stream.truncate()
 
-def getSummoner(summoner, lol):
-    if (lol == None):
+def getDefaultLoLPath():
 	if (os.name == 'posix'): #Linux and Mac
-	    lol = os.path.join(os.environ.get('WINEPREFIX', os.path.expanduser('~/.wine')), 'drive_c', 'Riot Games', 'League of Legends')
-	    if not (os.path.exists(lol)):
-	      raise IOError('Cannot find LoL installation!')
-	    
-	elif (os.name == 'nt'): #Windows
-	    lol = os.path.join('C:', 'Riot Games', 'League of Legends')
-	    if not (os.path.exists(lol)):
-		raise IOError('Cannot find LoL installation!')
+		ret = os.path.join(os.environ.get('WINEPREFIX', os.path.expanduser('~/.wine')), 'drive_c', 'Riot Games', 'League of Legends')
+	elif (os.name == 'nt'):  #Windows
+		ret = os.path.join('C:\\', 'Riot Games', 'League of Legends') # Weird... 'C:', 'Riot -> C:Riot for some reason...
 	else:
-	    raise NotImplementedError() #ummm? Android? idk...
-    
-    lol = os.path.join(lol, 'RADS', 'projects', 'lol_air_client', 'releases')
-    if not (os.path.exists(lol)):
-	raise IOError('Cannot find complete LoL installation!')
-    
-    version = os.listdir(lol)[-1] #Latest version, hopefully...
-    
-    lol = os.path.join(lol, version, 'deploy', 'preferences')
-    
-    if (summoner is None):
-        summoners = filter(lambda x: (x[:7] <> 'shared_') and (x <> 'global'), os.listdir(lol)) #List summoners
-	if (len(summoners) == 0):
-	    raise IOError('You have no summoners!')
-	if (len(summoners) > 1):
-	    raise Exception('I have more than 1 summoner!')
-	summoner = summoners[0][:-11]
-    
-    lol = os.path.join(lol, summoner + '.properties')
-    
-    if not (os.path.exists(lol)):
-	raise IOError('Cannot find summoner! (' + lol + ')')
-    
-    return lol
-    
+		raise NotImplementedError() #ummm? Android? idk...
+		
+	if not (os.path.exists(ret)):
+		raise IOError('Cannot find LoL installation at "' + ret + '"!')
+	
+	return ret
+
+def getSummonersPath(lol = None, version = None):
+	if (lol is None):
+		lol = getDefaultLoLPath()
+		
+	lol = os.path.join(lol, 'RADS', 'projects', 'lol_air_client', 'releases')
+	if not (os.path.exists(lol)):
+		raise IOError('Cannot find complete LoL installation!')
+	
+	if (version is None):
+		version = os.listdir(lol)[-1] #Latest version, hopefully...
+		
+	return os.path.join(lol, version, 'deploy', 'preferences')
+
+def getSummoners(lol = None, version = None, path = None):
+	if (path is None):
+		path = getSummonersPath(lol, version)
+	return filter(lambda x: (x[:7] <> 'shared_') and (x <> 'global'), os.listdir(path))
+
+def getSummoner(summoner = None, lol = None, version = None):
+	path = getSummonersPath(lol, version)
+	
+	if (summoner is None):
+		summoners = getSummoners(lol, version, path)
+		if (len(summoners) == 0):
+			raise IOError('You have no summoners!')
+		if (len(summoners) > 1):
+			raise Exception('You have more than 1 summoner, please specify a summoner!')
+		summoner = summoners[0][:-11]
+	
+	ret = os.path.join(path, summoner + '.properties')
+	
+	if not (os.path.exists(ret)):
+		raise IOError('Cannot find summoner! (' + ret + ')')
+	
+	return ret
+	
 
 if (__name__ == '__main__'):
 	parser = argparse.ArgumentParser(description='League of Legends - Item Set Manager', prog='LoLISM')
@@ -257,22 +269,22 @@ if (__name__ == '__main__'):
 		itemset.link = args.link
 	
 	if (args.summoner <> None) or (args.prop_file <> None) or (args.itemset <> None):
-	    if (args.prop_file == None):
-		args.prop_file = getSummoner(args.summoner, args.lol)
-	    propfile = PropertiesFile(args.prop_file)
-	    propfile.read()
-	    itemSets = ItemSetDecoder().decode(propfile.data.itemSets)
-	    if (args.itemset <> None):
-		itemset = itemSets.itemSets[args.itemset]
+		if (args.prop_file == None):
+			args.prop_file = getSummoner(args.summoner, args.lol)
+			propfile = PropertiesFile(args.prop_file)
+			propfile.read()
+			itemSets = ItemSetDecoder().decode(propfile.data.itemSets)
+		if (args.itemset <> None):
+			itemset = itemSets.itemSets[args.itemset]
 	
 	if (args.action == 'print'):
-	    if (args.format == 'json'):
-		print itemset
-	    elif (args.format == 'link'):
-		print itemset.link
-	    else:
-		print itemset.string
+		if (args.format == 'json'):
+			print itemset
+		elif (args.format == 'link'):
+			print itemset.link
+		else:
+			print itemset.string
 	else:
-	    itemSets.itemSets.append(itemset)
-	    propfile.data.itemSets = itemSets.string
-	    propfile.write()
+		itemSets.itemSets.append(itemset)
+		propfile.data.itemSets = itemSets.string
+		propfile.write()
