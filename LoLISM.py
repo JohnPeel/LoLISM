@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*- 
 
 import json
 import zlib
@@ -176,12 +178,13 @@ class PropertiesFile(object):
 			self.encoder = pyamf.amf3.Encoder()
 		
 		self.createBackup = createBackup
-			
+		self.data = UserPrefs()
 
 	def read(self):
 		with open(self.filename, 'rb') as f:
 			self.decoder.send(f.read())
 			self.data = self.decoder.readElement()
+	
 	def write(self):
 		if self.createBackup:
 			shutil.copyfile(self.filename, self.filename + '.bak')
@@ -221,10 +224,11 @@ def getSummonersPath(lol = None, version = None):
 def getSummoners(lol = None, version = None, path = None):
 	if (path is None):
 		path = getSummonersPath(lol, version)
-	return filter(lambda x: (x[:7] <> 'shared_') and (x <> 'global'), os.listdir(path))
+	return [x[:-11] for x in filter(lambda x: (x[:7] <> 'shared_') and (x <> 'global') and (x[-4:] <> '.bak'), os.listdir(path))]
 
-def getSummoner(summoner = None, lol = None, version = None):
-	path = getSummonersPath(lol, version)
+def getSummoner(summoner = None, lol = None, version = None, path = None):
+	if (path is None):
+		path = getSummonersPath(lol, version)
 	
 	if (summoner is None):
 		summoners = getSummoners(lol, version, path)
@@ -232,7 +236,7 @@ def getSummoner(summoner = None, lol = None, version = None):
 			raise IOError('You have no summoners!')
 		if (len(summoners) > 1):
 			raise Exception('You have more than 1 summoner, please specify a summoner!')
-		summoner = summoners[0][:-11]
+		summoner = summoners[0]
 	
 	ret = os.path.join(path, summoner + '.properties')
 	
@@ -271,9 +275,9 @@ if (__name__ == '__main__'):
 	if (args.summoner <> None) or (args.prop_file <> None) or (args.itemset <> None):
 		if (args.prop_file == None):
 			args.prop_file = getSummoner(args.summoner, args.lol)
-			propfile = PropertiesFile(args.prop_file)
-			propfile.read()
-			itemSets = ItemSetDecoder().decode(propfile.data.itemSets)
+		propfile = PropertiesFile(args.prop_file)
+		propfile.read()
+		itemSets = ItemSetDecoder().decode(propfile.data.itemSets)
 		if (args.itemset <> None):
 			itemset = itemSets.itemSets[args.itemset]
 	
