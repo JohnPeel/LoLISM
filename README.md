@@ -24,3 +24,14 @@ optional arguments:
   -i, --inject          Inject ITEMSET into SUMMONER.
   -p, --print           Print ITEMSET to stdout. [DEFAULT]
 ```
+
+```
+usage: LoLISM-gui [-h] (-l LINK | -j JSON)
+
+League of Legends - Item Set Manager
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l LINK, --link LINK  ItemSet Link
+  -j JSON, --json JSON  JSON File
+```
